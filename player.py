@@ -4,11 +4,13 @@ from multiprocessing import shared_memory
 import numpy as np
 
 if __name__ == "__main__":
-    existing_shm = shared_memory.SharedMemory(name='smh_00')
-    buffer = existing_shm.buf
-    buffer[1] = 8
-    b = input("")
-    existing_shm.close()
+    existing_shm_pid = shared_memory.SharedMemory(name='smh_00')
+    pid_buffer = existing_shm_pid.buf
+    existing_shm_offer = shared_memory.SharedMemory(name='smh_01')
+    offer_buffer = existing_shm_pid.offer
+
+    existing_shm_pid.close()
+    existing_shm_offer.close()
 
 
     #key = 128
