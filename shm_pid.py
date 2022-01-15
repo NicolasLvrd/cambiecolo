@@ -4,7 +4,7 @@ from multiprocessing import Lock
 
 class MyRemoteClass:
     def __init__(self):
-        self.value = ()
+        self.value = []
         self.lock = Lock()
 
     def get_list(self):
@@ -14,7 +14,7 @@ class MyRemoteClass:
         self.value = pushed_list
 
     def aquire(self):
-        self.lock.aquire()
+        self.lock.acquire()
 
     def release(self):
         self.lock.release()
@@ -23,9 +23,8 @@ class MyRemoteClass:
 class MyManager(BaseManager):
     pass
 
-
 remote = MyRemoteClass()
-MyManager.register("pid_list", callable=lambda: remote)
-m = MyManager(address=("127.0.0.1", 8888), authkey=b'aa')
+MyManager.register('pid_list', callable=lambda:remote)
+m = MyManager(address=("127.0.5.11", 8888), authkey=b'aa')
 s = m.get_server()
 s.serve_forever()

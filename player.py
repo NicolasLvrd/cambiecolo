@@ -3,6 +3,10 @@ import sysv_ipc
 from multiprocessing.managers import BaseManager
 import os
 
+def string_to_list(string):
+    li = list(string.split(" "))
+    return li
+
 if __name__ == "__main__":
 
     class MyManager(BaseManager): pass
@@ -19,30 +23,17 @@ if __name__ == "__main__":
     flag = MyManager(address=("127.0.0.3", 8888), authkey=b'cc')
     flag.connect()
 
+    key = 121
+    mq_setting_up = sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
+
+    value = os.getgid()
+    message = str(value).encode()
+    mq_setting_up.send(message, True, 1)
+
+    message, t = mq_setting_up.receive(True, 2)
+    value = message.decode()
+    deck = string_to_list(value)
+    print(deck)
 
 
-    # le player ajoute son pid dans la shm_pid
-    pid_list = pid.pid_list()
-    pid_list.aquire()
-    tab = pid_list.get_list()
-    tab.append(tab, os.pid())
-    pid_list.put_list(tab)
-    pid_list.release()
 
-    '''
-    key = 128
-    mq_dispenser = sysv_ipc.MessageQueue(key)
-    key = 256
-    mq_communication = sysv_ipc.MessageQueue(key)
-
-    '''
-
-    '''
-    for i in range(len(pid_buffer)):
-        if pid_buffer[i] is None:
-            if __name__ == '__main__':
-                pid_buffer[i] = os.getpid()
-
-    shm_pid.close()
-    shm_offer.close()
-    '''
