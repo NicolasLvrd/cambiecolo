@@ -13,11 +13,13 @@ class MyRemoteClass:
     def put_list(self, pushed_list):
         self.value = pushed_list
 
-    def aquire(self):
+    def acquire(self):
         self.lock.acquire()
+        print("offer lock acquired")
 
     def release(self):
         self.lock.release()
+        print("offer lock released")
 
 
 class MyManager(BaseManager):
