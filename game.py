@@ -19,8 +19,12 @@ if __name__ == "__main__":
     players_number = int(sys.argv[1])
 
     # mq pour gérer la mise en place du jeu
-    key = 121
-    mq_setting_up = sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
+    key1 = 121
+    mq_setting_up = sysv_ipc.MessageQueue(key1, sysv_ipc.IPC_CREAT)
+
+    # mq pour gérer la mise en place du jeu
+    key2 = 256
+    mq_communication = sysv_ipc.MessageQueue(key2, sysv_ipc.IPC_CREAT)
 
 
     # lancement des shared memories
@@ -87,9 +91,11 @@ if __name__ == "__main__":
 
     print("All players joined")
 
+
     for i in range(players_number):
         message = "0".encode()
         mq_setting_up.send(message)
+    
 
     # création du deck (jeu de carte pour cette partie)
     cards = ("airplane", "car", "train", "bike", "shoes")
@@ -130,3 +136,4 @@ if __name__ == "__main__":
                 print(tab_pid[idx], tab_offer[idx], tab_flag[idx])
 
     mq_setting_up.remove()
+    mq_communication.remove()

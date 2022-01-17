@@ -7,6 +7,8 @@ from multiprocessing.managers import BaseManager
 import os
 import sys
 
+from sysv_ipc import BusyError
+
 
 def add_input(input_queue):
     while True:
@@ -26,8 +28,7 @@ def display_offers(offers):
 
 
 def offer_validity(acronyms, deck):
-
-    if len(acronyms)>3:
+    if len(acronyms) > 3:
         return False,
 
     for char in acronyms:
@@ -52,18 +53,23 @@ def offer_validity(acronyms, deck):
             return False,
     return True, my_offer, deck
 
-def receive_validity(input, my_offer):
-    if len(input[2:]) is not 1:
+
+def receive_validity(offers, input, my_offer):
+    print(offers)
+    print(input)
+    print(my_offer)
+    if len(input) != 1:
         return False
-    if not isinstance(input[2], int):
+    try:
+        player_number = int(input[0])
+    except ValueError:
         return False
-    if len(old_offers[input[2]]) is not len(my_offer):
+    if len(offers[player_number]) is not len(my_offer):
         return False
     return True
 
 
 if __name__ == "__main__":
-
 
     class MyManager(BaseManager):
         pass
@@ -81,10 +87,13 @@ if __name__ == "__main__":
     flag = MyManager(address=("127.0.5.13", 8888), authkey=b'cc')
     flag.connect()
 
-    key = 121
-    mq_setting_up = sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
+    key1 = 121
+    mq_setting_up = sysv_ipc.MessageQueue(key1, sysv_ipc.IPC_CREAT)
 
-    #my_pid = os.getgid()
+    key2 = 256
+    mq_communication = sysv_ipc.MessageQueue(key2, sysv_ipc.IPC_CREAT)
+
+    # my_pid = os.getgid()
     my_pid = random.randint(0, 9999)
     print("MY PID IS ", my_pid)
     message = str(my_pid).encode()
@@ -119,19 +128,20 @@ if __name__ == "__main__":
 
     while True:
         time.sleep(1)
+
         offer_list = offer.offer_list()
         offer_list.acquire()
         new_offers = offer_list.get_list()
         offer_list.release()
 
         if new_offers != old_offers:
-            clear()
+            #clear()
             print(err_message)
             print("")
             print("MY PLAYER NUMBER :", my_player_number)
             display_offers(new_offers)
             print("YOUR DECK : ", deck)
-            print("YOUR OFFER (N°"+my_player_number+") :", my_offer)
+            print("YOUR OFFER (N°", my_player_number, ") :", my_offer)
             print("(to make a new offer, type \"o:\" and first letters of cards)")
             print("(to accept an offer, type \"a:\" and its number)")
 
@@ -139,71 +149,96 @@ if __name__ == "__main__":
             flag_list = flag.flag_list()
             flag_list.acquire()
             flags = flag_list.get_list()
-            if flags[my_player_number]:
+            if flags[my_player_number]:  # si un échange n'est pas en cours avec moi
                 flags[my_player_number] = False
-                flag_list.put_list(flags)
-                flag_list.release()
-            else :
-                err_message = "an exchange is already in progress"
-                flag_list.release()
-                break
-
-
-            input = input_queue.get()
-            input = input[:-1]
-            print("INPUT : ", input)
-            print(input[0] + input[1])
-            if input[0] + input[1] == "o:":
-                valid_offer = offer_validity(input[2:], deck)
-
-                if valid_offer[0] and flags[my_player_number]:
-                    print("valid offer")
-                    my_offer = valid_offer[1]
-                    deck = valid_offer[2]
-
-                    offer_list = offer.offer_list()
-                    offer_list.acquire()
-                    old_offers = offer_list.get_list()
-                    my_old_offer = old_offers[my_player_number]
-                    new_offers = old_offers
-                    new_offers[my_player_number] = my_offer
-                    offer_list.put_list(new_offers)
-                    offer_list.release()
-                    deck = deck + my_old_offer
-                else:
-                    err_message = "invalid offer or old offer accepted"
-
-                flag_list.acquire()
-                flags = flag_list.get_list()
-                flags[my_player_number] = True
-                flag_list.put_list(flags)
-                flag_list.release()
-
-            elif input[0] + input[1] == "a:":
                 offer_list = offer.offer_list()
                 offer_list.acquire()
                 old_offers = offer_list.get_list()
-                if receive_validity(input, my_offer):
-                    if flags[input[2]] == True:
 
-                    else :
-                        err_message = "an exchange is already in progress"
-                        offer_list.release()
-                        flag_list.release()
-                        break
+                input = input_queue.get()
+                input = input[:-1]
+                if input[0] + input[1] == "o:":
+                    valid_offer = offer_validity(input[2:], deck)
 
+                    if valid_offer[0]:
+                        print("VALIDE")
+                        my_offer = valid_offer[1]
+                        deck = valid_offer[2]
 
+                        # offer_list = offer.offer_list()
+                        # offer_list.acquire()
+                        # old_offers = offer_list.get_list()
+                        my_old_offer = old_offers[my_player_number]
+                        new_offers = old_offers
+                        new_offers[my_player_number] = my_offer
+                        offer_list.put_list(new_offers)
+                        # offer_list.release()
+                        deck = deck + my_old_offer
+                    else:
+                        err_message = "invalid offer or old offer accepted"
+
+                    # flag_list.acquire()
+                    # flags = flag_list.get_list()
+                    flags[my_player_number] = True
+                    # flag_list.put_list(flags)
+                    # flag_list.release()
+
+                elif input[0] + input[1] == "a:":
+                    # offer_list = offer.offer_list()
+                    # offer_list.acquire()
+                    # old_offers = offer_list.get_list()
+                    if receive_validity(old_offers, input[2:], my_offer):
+                        if flags[int(input[2])]:
+                            deck = deck + old_offers[int(input[2])]
+                            old_offers[int(input[2])] = []
+                            my_offer = []
+                            new_offers = old_offers
+                            message = str(my_player_number).encode()
+                            mq_setting_up.send(message, True, int(input[2]) + 3)  # +3 car type 1 et 2 déjà utilisés
+                            # offer_list.release()
+                            # flag_list.release()
+                        else:
+                            err_message = "an exchange is already in progress"
+                            # offer_list.release()
+                            flags[int(input[2])] = True
+                            flags[my_player_number] = True
+                            # flag_list.release()
+                            break
+                    else:
+                        err_message = "invalid accept"
+
+                else:
+                    err_message = "input error"
+                offer_list.release()
+                #clear()
+                print(err_message)
+                print("")
+                print("MY PLAYER NUMBER :", my_player_number)
+                display_offers(new_offers)
+                print("YOUR DECK : ", deck)
+                print("YOUR OFFER (N°", my_player_number, ") :", my_offer)
+                print("(to make a new offer, type \"o:\" and first letters of cards)")
+                print("(to accept an offer, type \"a:\" and its number)")
             else:
-                err_message = "input error"
+                err_message = "an exchange is already in progress"
+            flag_list.release()
 
-            clear()
-            print(err_message)
-            print("")
-            print("MY PLAYER NUMBER :", my_player_number)
-            display_offers(new_offers)
-            print("YOUR DECK : ", deck)
-            print("YOUR OFFER (N°"+my_player_number+") :", my_offer)
-            print("(to make a new offer, type \"o:\" and first letters of cards)")
-            print("(to accept an offer, type \"a:\" and its number)")
+        try:
+            message, t = mq_communication.receive(False, my_player_number + 3)
+            print("GOOOTCHA")
+            value = message.decode()
+            value = int(value)
+            flag_list = flag.flag_list()
+            flag_list.acquire()
+            flags = flag_list.get_list()
+            deck = deck + new_offers[value]
+            new_offers[value] = []
+            my_offer = []
+            flags[my_player_number] = True
+            flags[value] = True
+            flag_list.put_list(flags)
+            flag_list.release()
+        except BusyError:
+            a=1
 
         old_offers = new_offers
