@@ -4,7 +4,7 @@ from multiprocessing import Lock
 
 class MyRemoteClass:
     def __init__(self):
-        self.value = []
+        self.value = []*5
         self.lock = Lock()
 
     def get_list(self):

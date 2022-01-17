@@ -72,7 +72,7 @@ if __name__ == "__main__":
         offer_list = offer.offer_list()
         offer_list.acquire()
         tab = offer_list.get_list()
-        initial_offer = [0, ]
+        initial_offer = []
         tab.append(initial_offer)
         offer_list.put_list(tab)
         offer_list.release()
