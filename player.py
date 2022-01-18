@@ -1,12 +1,10 @@
 import queue
 import random
 import threading
-import time
 import sysv_ipc
 from multiprocessing.managers import BaseManager
 import os
 import sys
-
 from sysv_ipc import BusyError
 
 
@@ -26,6 +24,12 @@ def display_offers(offers):
         print(len(offer), " ", end="")
     print("")
 
+def check_win(deck):
+    first_card = deck[0]
+    for card in deck[1:]:
+        if card is not first_card:
+            return False
+    return True
 
 def offer_validity(acronyms, deck):
     if len(acronyms) > 3:
@@ -54,17 +58,19 @@ def offer_validity(acronyms, deck):
     return True, my_offer, deck
 
 
-def receive_validity(offers, input, my_offer):
+def receive_validity(offers, input, my_offer, my_player_number):
     print(offers)
     print(input)
     print(my_offer)
-    if len(input) != 1:
+    if len(input) != 1:     # le numéro de joueur n'est pas composé d'un seul caractère
         return False
     try:
         player_number = int(input[0])
-    except ValueError:
+    except ValueError:      # le numéro de joueur n'est pas un entier
         return False
-    if len(offers[player_number]) is not len(my_offer):
+    if int(input[0]) == my_player_number:   # le joueur essaye d'accepter sa propre offre
+        return False
+    if len(offers[player_number]) is not len(my_offer):     # l'offre à accepté ne contient pas autant de carte que l'ofrre du joueur
         return False
     return True
 
@@ -93,8 +99,8 @@ if __name__ == "__main__":
     key2 = 256
     mq_communication = sysv_ipc.MessageQueue(key2, sysv_ipc.IPC_CREAT)
 
-    # my_pid = os.getgid()
-    my_pid = random.randint(0, 9999)
+    my_pid = os.getpid()
+    #my_pid = random.randint(0, 9999)
     print("MY PID IS ", my_pid)
     message = str(my_pid).encode()
     mq_setting_up.send(message, True, 1)
@@ -127,15 +133,14 @@ if __name__ == "__main__":
     my_offer = []
 
     while True:
-        time.sleep(1)
+        #time.sleep(1)
 
         offer_list = offer.offer_list()
         offer_list.acquire()
         new_offers = offer_list.get_list()
         offer_list.release()
-
         if new_offers != old_offers:
-            #clear()
+            clear()
             print(err_message)
             print("")
             print("MY PLAYER NUMBER :", my_player_number)
@@ -187,14 +192,17 @@ if __name__ == "__main__":
                     # offer_list = offer.offer_list()
                     # offer_list.acquire()
                     # old_offers = offer_list.get_list()
-                    if receive_validity(old_offers, input[2:], my_offer):
+                    if receive_validity(old_offers, input[2:], my_offer, my_player_number):
                         if flags[int(input[2])]:
+                            flags[int(input[2])] = False
+
                             deck = deck + old_offers[int(input[2])]
                             old_offers[int(input[2])] = []
                             my_offer = []
                             new_offers = old_offers
+                            offer_list.put_list(new_offers)
                             message = str(my_player_number).encode()
-                            mq_setting_up.send(message, True, int(input[2]) + 3)  # +3 car type 1 et 2 déjà utilisés
+                            mq_communication.send(message, True, int(input[2]) + 3)  # +3 car type 1 et 2 déjà utilisés
                             # offer_list.release()
                             # flag_list.release()
                         else:
@@ -209,8 +217,10 @@ if __name__ == "__main__":
 
                 else:
                     err_message = "input error"
+
+                flag_list.put_list(flags)
                 offer_list.release()
-                #clear()
+                clear()
                 print(err_message)
                 print("")
                 print("MY PLAYER NUMBER :", my_player_number)
@@ -225,20 +235,42 @@ if __name__ == "__main__":
 
         try:
             message, t = mq_communication.receive(False, my_player_number + 3)
-            print("GOOOTCHA")
             value = message.decode()
             value = int(value)
+
             flag_list = flag.flag_list()
             flag_list.acquire()
             flags = flag_list.get_list()
-            deck = deck + new_offers[value]
-            new_offers[value] = []
+
+            offer_list = offer.offer_list()
+            offer_list.acquire()
+            old_offers = offer_list.get_list()
+
+            deck = deck + old_offers[value]
+            old_offers[value] = []
+            new_offers = old_offers
             my_offer = []
+
+            offer_list.put_list(new_offers)
             flags[my_player_number] = True
             flags[value] = True
             flag_list.put_list(flags)
             flag_list.release()
+            offer_list.release()
+
+            clear()
+            print(err_message)
+            print("")
+            print("MY PLAYER NUMBER :", my_player_number)
+            display_offers(new_offers)
+            print("YOUR DECK : ", deck)
+            print("YOUR OFFER (N°", my_player_number, ") :", my_offer)
+            print("(to make a new offer, type \"o:\" and first letters of cards)")
+            print("(to accept an offer, type \"a:\" and its number)")
         except BusyError:
             a=1
+
+        #if check_win(deck):
+
 
         old_offers = new_offers

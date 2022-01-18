@@ -1,10 +1,10 @@
+import queue
 import random
-from multiprocessing import Process, Lock
+import threading
 from multiprocessing.managers import BaseManager
 import sysv_ipc
 import signal
 import sys
-import time
 import os
 import subprocess
 
@@ -13,6 +13,16 @@ def list_to_string(list):
     str = ' '.join(list)
     return str
 
+
+clear = lambda: os.system('clear')
+
+def add_input(input_queue):
+    while True:
+        input_queue.put(sys.stdin.readline())
+
+def handler(sig, frame):
+    if sig == signal.SIGUSR1:
+        print("exit")
 
 if __name__ == "__main__":
 
@@ -25,12 +35,6 @@ if __name__ == "__main__":
     # mq pour gérer la mise en place du jeu
     key2 = 256
     mq_communication = sysv_ipc.MessageQueue(key2, sysv_ipc.IPC_CREAT)
-
-
-    # lancement des shared memories
-    # shm_pid = subprocess.Popen(["python", "shm_pid.py"])
-    # shm_offer = subprocess.Popen(["python", "shm_offer.py"])
-    # shm_flag = subprocess.Popen(["python", "shm_flag.py"])
 
     class MyManager(BaseManager):
         pass
@@ -51,15 +55,10 @@ if __name__ == "__main__":
 
     # on attend que tous les players rejoignent la partie
     current_players_number = 0
-
-    pid_list = pid.pid_list()
-    pid_list.acquire()
-    tab = pid_list.get_list()
-    print(tab)
-    pid_list.release()
-
+    print("waiting for ", players_number - current_players_number, "players...")
     while current_players_number != players_number:
-        print("waiting for players...")
+        clear()
+        print("waiting for ", players_number-current_players_number, "players...")
         message, t = mq_setting_up.receive(True, 1)
         value = message.decode()
         value = int(value)
@@ -89,20 +88,18 @@ if __name__ == "__main__":
         flag_list.put_list(tab)
         flag_list.release()
 
-    print("All players joined")
-
-
+    '''
     for i in range(players_number):
         message = "0".encode()
         mq_setting_up.send(message)
-    
+    '''
 
     # création du deck (jeu de carte pour cette partie)
     cards = ("airplane", "car", "train", "bike", "shoes")
     deck = []
     for i in range(players_number):
         for j in range(5):
-            deck.append(cards[j])
+            deck.append(cards[i])
 
     # distribution des cartes
     for i in range(players_number):
@@ -115,25 +112,39 @@ if __name__ == "__main__":
         message = list_to_string(player_deck).encode()
         mq_setting_up.send(message, True, 2)
 
+    # mise en place d'une saisie non bloquante pour quitter le jeu en cours
+    input_queue = queue.Queue()
+    input_thread = threading.Thread(target=add_input, args=(input_queue,))
+    input_thread.daemon = True
+    input_thread.start()
+
+    old_offers = []
     while True:
-        i = input()
-        if i == "e":
-            break
-        else:
+
+        offer_list = offer.offer_list()
+        offer_list.acquire()
+        new_offers = offer_list.get_list()
+        offer_list.release()
+        if new_offers != old_offers:
             pid_list = pid.pid_list()
-            offer_list = offer.offer_list()
             flag_list = flag.flag_list()
             pid_list.acquire()
-            offer_list.acquire()
             flag_list.acquire()
             tab_pid = pid_list.get_list()
-            tab_offer = offer_list.get_list()
             tab_flag = flag_list.get_list()
             pid_list.release()
-            offer_list.release()
             flag_list.release()
+            clear()
             for idx, i in enumerate(tab_pid):
-                print(tab_pid[idx], tab_offer[idx], tab_flag[idx])
+                print(tab_pid[idx], new_offers[idx], tab_flag[idx])
+            print("")
+            print("type q to quit")
+
+        if not input_queue.empty():
+            input = input_queue.get()
+            if input[0] == "q":
+                break
+        old_offers = new_offers
 
     mq_setting_up.remove()
     mq_communication.remove()
