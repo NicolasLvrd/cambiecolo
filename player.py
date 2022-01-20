@@ -1,11 +1,25 @@
 import queue
-import random
 import threading
 import sysv_ipc
 from multiprocessing.managers import BaseManager
 import os
 import sys
 from sysv_ipc import BusyError
+import signal
+
+game_over = False
+
+
+def game_communication():
+    def handler(sig, frame):
+        if sig == signal.SIGUSR2:
+            global game_over
+            game_over = True
+
+    signal.signal(signal.SIGUSR2, handler)
+
+    while True:
+        pass
 
 
 def add_input(input_queue):
@@ -24,12 +38,14 @@ def display_offers(offers):
         print(len(offer), " ", end="")
     print("")
 
+
 def check_win(deck):
     first_card = deck[0]
     for card in deck[1:]:
         if card is not first_card:
             return False
     return True
+
 
 def offer_validity(acronyms, deck):
     if len(acronyms) > 3:
@@ -62,20 +78,24 @@ def receive_validity(offers, input, my_offer, my_player_number):
     print(offers)
     print(input)
     print(my_offer)
-    if len(input) != 1:     # le numéro de joueur n'est pas composé d'un seul caractère
+    if len(input) != 1:  # le numéro de joueur n'est pas composé d'un seul caractère
         return False
     try:
         player_number = int(input[0])
-    except ValueError:      # le numéro de joueur n'est pas un entier
+    except ValueError:  # le numéro de joueur n'est pas un entier
         return False
-    if int(input[0]) == my_player_number:   # le joueur essaye d'accepter sa propre offre
+    if int(input[0]) == my_player_number:  # le joueur essaye d'accepter sa propre offre
         return False
-    if len(offers[player_number]) is not len(my_offer):     # l'offre à accepté ne contient pas autant de carte que l'ofrre du joueur
+    if len(offers[player_number]) is not len(
+            my_offer):  # l'offre à accepté ne contient pas autant de carte que l'ofrre du joueur
         return False
     return True
 
 
 if __name__ == "__main__":
+
+    thread = threading.Thread(target=game_communication, args=())
+    thread.start()
 
     class MyManager(BaseManager):
         pass
@@ -100,14 +120,16 @@ if __name__ == "__main__":
     mq_communication = sysv_ipc.MessageQueue(key2, sysv_ipc.IPC_CREAT)
 
     my_pid = os.getpid()
-    #my_pid = random.randint(0, 9999)
+    # my_pid = random.randint(0, 9999)
     print("MY PID IS ", my_pid)
     message = str(my_pid).encode()
     mq_setting_up.send(message, True, 1)
 
     message, t = mq_setting_up.receive(True, 2)
     value = message.decode()
-    deck = string_to_list(value)
+    value = string_to_list(value)
+    deck = value[:-1]
+    game_pid = value[-1]
 
     # trouver son numéro de joueur
     pid_list = pid.pid_list()
@@ -132,8 +154,8 @@ if __name__ == "__main__":
 
     my_offer = []
 
-    while True:
-        #time.sleep(1)
+    while True and not game_over:
+        # time.sleep(1)
 
         offer_list = offer.offer_list()
         offer_list.acquire()
@@ -268,9 +290,22 @@ if __name__ == "__main__":
             print("(to make a new offer, type \"o:\" and first letters of cards)")
             print("(to accept an offer, type \"a:\" and its number)")
         except BusyError:
-            a=1
+            a = 1
 
-        #if check_win(deck):
-
+        if check_win(deck):
+            os.kill(game_pid, signal.SIGUSR1)
 
         old_offers = new_offers
+
+    pid_list = pid.pid_list()
+    pid_list.acquire()
+    tab = pid_list.get_list()
+
+    print("player", tab[-1], "win")
+    pid_list.release()
+
+    value = ""
+    message = value.encode()
+    mq_setting_up.send(message, True, 3)
+
+    os.kill()

@@ -6,7 +6,19 @@ import sysv_ipc
 import signal
 import sys
 import os
-import subprocess
+
+game_over = False
+
+def player_communication():
+    def handler(sig, frame):
+        if sig == signal.SIGUSR1:
+            global game_over
+            game_over = True
+
+    signal.signal(signal.SIGUSR1, handler)
+
+    while True:
+        pass
 
 
 def list_to_string(list):
@@ -27,6 +39,9 @@ def handler(sig, frame):
 if __name__ == "__main__":
 
     players_number = int(sys.argv[1])
+
+    thread = threading.Thread(target=player_communication, args=())
+    thread.start()
 
     # mq pour gérer la mise en place du jeu
     key1 = 121
@@ -108,7 +123,7 @@ if __name__ == "__main__":
             card = random.choice(deck)
             player_deck.append(card)
             deck.remove(card)
-        print(list_to_string(player_deck))
+        players_number.append(os.getpid())  # donne pid de game au joueur
         message = list_to_string(player_deck).encode()
         mq_setting_up.send(message, True, 2)
 
@@ -146,5 +161,30 @@ if __name__ == "__main__":
                 break
         old_offers = new_offers
 
-    mq_setting_up.remove()
-    mq_communication.remove()
+        if game_over:
+            for i in range(players_number):
+                message, t = mq_setting_up.receive(True, 3)
+
+            mq_setting_up.remove()
+            mq_communication.remove()
+
+            pid_list = pid.pid_list()
+            pid_list.acquire()
+            pid_list.put_list([])
+            pid_list.release()
+
+            offer_list = offer.offer_list()
+            offer_list.acquire()
+            offer_list.put_list([])
+            offer_list.release()
+
+            flag_list = offer.offer_list()
+            flag_list.acquire()
+            flag_list.put_list([])
+            flag_list.release()
+
+            print("game over")
+
+            break
+
+
