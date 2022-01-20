@@ -1,7 +1,6 @@
 import queue
 import threading
 import time
-
 import sysv_ipc
 from multiprocessing.managers import BaseManager
 import os
@@ -16,6 +15,7 @@ def handler(sig, frame):
     if sig == signal.SIGUSR2:
         global game_over
         game_over = True
+
 
 def add_input(input_queue):
     while True:
@@ -86,7 +86,8 @@ def receive_validity(offers, input, my_offer, my_player_number):
         return False
     if int(input[0]) == my_player_number:  # le joueur essaye d'accepter sa propre offre
         return False
-    if len(offers[player_number]) is not len(my_offer):  # l'offre à accepté ne contient pas autant de carte que l'offre du joueur
+    if len(offers[player_number]) is not len(
+            my_offer):  # l'offre à accepté ne contient pas autant de carte que l'offre du joueur
         return False
     return True
 
@@ -101,8 +102,10 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGUSR2, handler)
 
+
     class MyManager(BaseManager):
         pass
+
 
     MyManager.register('pid_list')
     pid = MyManager(address=("127.0.5.11", 8888), authkey=b'aa')
@@ -178,6 +181,7 @@ if __name__ == "__main__":
 
         if not input_queue.empty():
             flag_list = flag.flag_list()
+            print("1")
             flag_list.acquire()
             flags = flag_list.get_list()
             if flags[my_player_number]:  # si un échange n'est pas en cours avec moi
@@ -296,17 +300,13 @@ if __name__ == "__main__":
             a = 1
 
         if check_win(deck):
-            #print("YOU WIN !")
 
             pid_list.acquire()
             tab = pid_list.get_list()
             tab.append(my_player_number)
             pid_list.put_list(tab)
             pid_list.release()
-            #print("YAAAAAAAAAAAAA")
             os.kill(game_pid, signal.SIGUSR1)
-            #print("YAAAAAAAAAAAAA")
-            time.sleep(2)
 
         old_offers = new_offers
 
@@ -321,8 +321,7 @@ if __name__ == "__main__":
     message = value.encode()
     mq_setting_up.send(message, True, 3)
 
-    #sys.exit()
-
+    # sys.exit()
 
 '''
 if __name__ == "__main__":
