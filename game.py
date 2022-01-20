@@ -1,6 +1,7 @@
 import queue
 import random
 import threading
+import time
 from multiprocessing.managers import BaseManager
 import sysv_ipc
 import signal
@@ -9,16 +10,11 @@ import os
 
 game_over = False
 
-def player_communication():
-    def handler(sig, frame):
-        if sig == signal.SIGUSR1:
-            global game_over
-            game_over = True
 
-    signal.signal(signal.SIGUSR1, handler)
-
-    while True:
-        pass
+def handler(sig, frame):
+    if sig == signal.SIGUSR1:
+        global game_over
+        game_over = True
 
 
 def list_to_string(list):
@@ -28,20 +24,18 @@ def list_to_string(list):
 
 clear = lambda: os.system('clear')
 
+
 def add_input(input_queue):
     while True:
         input_queue.put(sys.stdin.readline())
 
-def handler(sig, frame):
-    if sig == signal.SIGUSR1:
-        print("exit")
 
 if __name__ == "__main__":
 
+    signal.signal(signal.SIGUSR1, handler)
+
     players_number = int(sys.argv[1])
 
-    thread = threading.Thread(target=player_communication, args=())
-    thread.start()
 
     # mq pour gérer la mise en place du jeu
     key1 = 121
@@ -50,6 +44,7 @@ if __name__ == "__main__":
     # mq pour gérer la mise en place du jeu
     key2 = 256
     mq_communication = sysv_ipc.MessageQueue(key2, sysv_ipc.IPC_CREAT)
+
 
     class MyManager(BaseManager):
         pass
@@ -70,10 +65,9 @@ if __name__ == "__main__":
 
     # on attend que tous les players rejoignent la partie
     current_players_number = 0
-    print("waiting for ", players_number - current_players_number, "players...")
     while current_players_number != players_number:
         clear()
-        print("waiting for ", players_number-current_players_number, "players...")
+        print("waiting for ", players_number - current_players_number, "players...")
         message, t = mq_setting_up.receive(True, 1)
         value = message.decode()
         value = int(value)
@@ -99,7 +93,6 @@ if __name__ == "__main__":
         flag_list.acquire()
         tab = flag_list.get_list()
         tab.append(True)
-        print(tab)
         flag_list.put_list(tab)
         flag_list.release()
 
@@ -123,7 +116,7 @@ if __name__ == "__main__":
             card = random.choice(deck)
             player_deck.append(card)
             deck.remove(card)
-        players_number.append(os.getpid())  # donne pid de game au joueur
+        player_deck.append(str(os.getpid()))  # donne pid de game au joueur
         message = list_to_string(player_deck).encode()
         mq_setting_up.send(message, True, 2)
 
@@ -135,7 +128,6 @@ if __name__ == "__main__":
 
     old_offers = []
     while True:
-
         offer_list = offer.offer_list()
         offer_list.acquire()
         new_offers = offer_list.get_list()
@@ -150,7 +142,7 @@ if __name__ == "__main__":
             pid_list.release()
             flag_list.release()
             clear()
-            for idx, i in enumerate(tab_pid):
+            for idx, i in enumerate(new_offers):
                 print(tab_pid[idx], new_offers[idx], tab_flag[idx])
             print("")
             print("type q to quit")
@@ -158,33 +150,54 @@ if __name__ == "__main__":
         if not input_queue.empty():
             input = input_queue.get()
             if input[0] == "q":
-                break
-        old_offers = new_offers
+                game_over
+                game_over = True
 
         if game_over:
+            pid_list = pid.pid_list()
+            pid_list.acquire()
+            tab = pid_list.get_list()
+            pid_list.release()
+
+            for i in range(players_number):
+                os.kill(tab[i], signal.SIGUSR2)
+
             for i in range(players_number):
                 message, t = mq_setting_up.receive(True, 3)
+                print("a player ack the end of game")
 
             mq_setting_up.remove()
             mq_communication.remove()
 
-            pid_list = pid.pid_list()
+            tab = []
+
             pid_list.acquire()
-            pid_list.put_list([])
+            pid_list.put_list(tab)
             pid_list.release()
 
             offer_list = offer.offer_list()
             offer_list.acquire()
-            offer_list.put_list([])
+            offer_list.put_list(tab)
             offer_list.release()
 
             flag_list = offer.offer_list()
             flag_list.acquire()
-            flag_list.put_list([])
+            flag_list.put_list(tab)
             flag_list.release()
 
             print("game over")
-
             break
 
+        old_offers = new_offers
 
+'''
+if __name__ == "__main__":
+
+    signal.signal(signal.SIGUSR1, handler)
+
+    thread = threading.Thread(target=main, args=())
+    thread.start()
+
+    while True:
+        pass
+'''

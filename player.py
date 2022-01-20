@@ -1,5 +1,7 @@
 import queue
 import threading
+import time
+
 import sysv_ipc
 from multiprocessing.managers import BaseManager
 import os
@@ -10,17 +12,10 @@ import signal
 game_over = False
 
 
-def game_communication():
-    def handler(sig, frame):
-        if sig == signal.SIGUSR2:
-            global game_over
-            game_over = True
-
-    signal.signal(signal.SIGUSR2, handler)
-
-    while True:
-        pass
-
+def handler(sig, frame):
+    if sig == signal.SIGUSR2:
+        global game_over
+        game_over = True
 
 def add_input(input_queue):
     while True:
@@ -40,9 +35,11 @@ def display_offers(offers):
 
 
 def check_win(deck):
+    if len(deck) != 5:
+        return False
     first_card = deck[0]
     for card in deck[1:]:
-        if card is not first_card:
+        if card != first_card:
             return False
     return True
 
@@ -60,24 +57,27 @@ def offer_validity(acronyms, deck):
         if char is not first_char:
             return False,
 
-    my_offer = []
-    for char in acronyms:
-        available = False
-        for card in deck:
-            if char == card[0]:
-                available = True
-                my_offer.append(card)
-                deck.remove(card)
-                break
-        if not available:
-            return False,
-    return True, my_offer, deck
+    cnt = 0
+    for card in deck:
+        if card[0] == first_char:
+            cnt += 1
+
+    if cnt >= len(acronyms):
+        my_offer = []
+        for char in acronyms:
+            for card in deck:
+                if char == card[0]:
+                    my_offer.append(card)
+                    deck.remove(card)
+                    break
+        return True, my_offer, deck
+    else:
+        return False,
 
 
 def receive_validity(offers, input, my_offer, my_player_number):
-    print(offers)
-    print(input)
-    print(my_offer)
+    if len(my_offer) == 0:  # le joueur n'a pas d'offre en cours
+        return False
     if len(input) != 1:  # le numéro de joueur n'est pas composé d'un seul caractère
         return False
     try:
@@ -86,20 +86,23 @@ def receive_validity(offers, input, my_offer, my_player_number):
         return False
     if int(input[0]) == my_player_number:  # le joueur essaye d'accepter sa propre offre
         return False
-    if len(offers[player_number]) is not len(
-            my_offer):  # l'offre à accepté ne contient pas autant de carte que l'ofrre du joueur
+    if len(offers[player_number]) is not len(my_offer):  # l'offre à accepté ne contient pas autant de carte que l'offre du joueur
         return False
     return True
 
 
 if __name__ == "__main__":
 
-    thread = threading.Thread(target=game_communication, args=())
-    thread.start()
+    input_queue = queue.Queue()
+
+    input_thread = threading.Thread(target=add_input, args=(input_queue,))
+    input_thread.daemon = True
+    input_thread.start()
+
+    signal.signal(signal.SIGUSR2, handler)
 
     class MyManager(BaseManager):
         pass
-
 
     MyManager.register('pid_list')
     pid = MyManager(address=("127.0.5.11", 8888), authkey=b'aa')
@@ -129,7 +132,7 @@ if __name__ == "__main__":
     value = message.decode()
     value = string_to_list(value)
     deck = value[:-1]
-    game_pid = value[-1]
+    game_pid = int(value[-1])
 
     # trouver son numéro de joueur
     pid_list = pid.pid_list()
@@ -140,11 +143,13 @@ if __name__ == "__main__":
         if i == my_pid:
             my_player_number = idx
 
+    '''
     input_queue = queue.Queue()
 
     input_thread = threading.Thread(target=add_input, args=(input_queue,))
     input_thread.daemon = True
     input_thread.start()
+    '''
 
     clear = lambda: os.system('clear')
 
@@ -155,7 +160,6 @@ if __name__ == "__main__":
     my_offer = []
 
     while True and not game_over:
-        # time.sleep(1)
 
         offer_list = offer.offer_list()
         offer_list.acquire()
@@ -188,7 +192,6 @@ if __name__ == "__main__":
                     valid_offer = offer_validity(input[2:], deck)
 
                     if valid_offer[0]:
-                        print("VALIDE")
                         my_offer = valid_offer[1]
                         deck = valid_offer[2]
 
@@ -293,7 +296,17 @@ if __name__ == "__main__":
             a = 1
 
         if check_win(deck):
+            #print("YOU WIN !")
+
+            pid_list.acquire()
+            tab = pid_list.get_list()
+            tab.append(my_player_number)
+            pid_list.put_list(tab)
+            pid_list.release()
+            #print("YAAAAAAAAAAAAA")
             os.kill(game_pid, signal.SIGUSR1)
+            #print("YAAAAAAAAAAAAA")
+            time.sleep(2)
 
         old_offers = new_offers
 
@@ -308,4 +321,22 @@ if __name__ == "__main__":
     message = value.encode()
     mq_setting_up.send(message, True, 3)
 
-    os.kill()
+    #sys.exit()
+
+
+'''
+if __name__ == "__main__":
+    input_queue = queue.Queue()
+
+    input_thread = threading.Thread(target=add_input, args=(input_queue,))
+    input_thread.daemon = True
+    input_thread.start()
+
+    signal.signal(signal.SIGUSR1, handler)
+
+    thread = threading.Thread(target=main, args=())
+    thread.start()
+
+    while True:
+        pass
+'''
