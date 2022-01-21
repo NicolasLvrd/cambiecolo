@@ -160,7 +160,10 @@ if __name__ == "__main__":
                 pid_list.release()
 
                 for i in range(players_number):
-                    os.kill(tab[i], signal.SIGUSR2)
+                    try:
+                        os.kill(tab[i], signal.SIGUSR2)
+                    except ProcessLookupError:
+                        players_number -= 1
 
                 for i in range(players_number):
                     message, t = mq_setting_up.receive(True, 3)

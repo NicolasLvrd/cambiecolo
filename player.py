@@ -242,6 +242,7 @@ if __name__ == "__main__":
                             # flag_list.release()
                             break
                     else:
+                        flags[my_player_number] = True
                         err_message = "invalid accept"
 
                 else:
@@ -307,6 +308,7 @@ if __name__ == "__main__":
             pid_list.put_list(tab)
             pid_list.release()
             os.kill(game_pid, signal.SIGUSR1)
+            game_over = True
 
         old_offers = new_offers
 
