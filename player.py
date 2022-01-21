@@ -146,14 +146,6 @@ if __name__ == "__main__":
         if i == my_pid:
             my_player_number = idx
 
-    '''
-    input_queue = queue.Queue()
-
-    input_thread = threading.Thread(target=add_input, args=(input_queue,))
-    input_thread.daemon = True
-    input_thread.start()
-    '''
-
     clear = lambda: os.system('clear')
 
     old_offers = []
@@ -303,7 +295,6 @@ if __name__ == "__main__":
             a = 1
 
         if check_win(deck) and not i_win:
-
             pid_list.acquire()
             tab = pid_list.get_list()
             tab.append(my_player_number)
@@ -325,21 +316,3 @@ if __name__ == "__main__":
     message = value.encode()
     mq_setting_up.send(message, True, 3)
 
-    # sys.exit()
-
-'''
-if __name__ == "__main__":
-    input_queue = queue.Queue()
-
-    input_thread = threading.Thread(target=add_input, args=(input_queue,))
-    input_thread.daemon = True
-    input_thread.start()
-
-    signal.signal(signal.SIGUSR1, handler)
-
-    thread = threading.Thread(target=main, args=())
-    thread.start()
-
-    while True:
-        pass
-'''

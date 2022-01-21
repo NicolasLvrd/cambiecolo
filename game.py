@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     players_number = int(sys.argv[1])
 
-    if players_number > 2 and players_number <= 5:
+    if 2 < players_number <= 5:
         signal.signal(signal.SIGUSR1, handler)
 
         # mq pour gérer la mise en place du jeu
@@ -195,15 +195,3 @@ if __name__ == "__main__":
 
     else:
         print("must be between 3 and 5 players")
-
-'''
-if __name__ == "__main__":
-
-    signal.signal(signal.SIGUSR1, handler)
-
-    thread = threading.Thread(target=main, args=())
-    thread.start()
-
-    while True:
-        pass
-'''
