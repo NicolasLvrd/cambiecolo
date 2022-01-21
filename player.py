@@ -45,7 +45,7 @@ def check_win(deck):
 
 
 def offer_validity(acronyms, deck):
-    if len(acronyms) > 3:
+    if len(acronyms) > 3 or len(acronyms) <= 0:
         return False,
 
     for char in acronyms:
@@ -162,6 +162,8 @@ if __name__ == "__main__":
 
     my_offer = []
 
+    i_win = False
+
     while True and not game_over:
 
         offer_list = offer.offer_list()
@@ -174,23 +176,22 @@ if __name__ == "__main__":
             print("")
             print("MY PLAYER NUMBER :", my_player_number)
             display_offers(new_offers)
-            print("YOUR DECK : ", deck)
-            print("YOUR OFFER (N°", my_player_number, ") :", my_offer)
-            print("(to make a new offer, type \"o:\" and first letters of cards)")
+            print("YOUR HAND :", deck)
+            print("YOUR OFFER :", my_offer)
+            print("(to make a new offer, type \"o:\" and the first letter of the card)")
             print("(to accept an offer, type \"a:\" and its number)")
 
         if not input_queue.empty():
             flag_list = flag.flag_list()
-            print("1")
             flag_list.acquire()
             flags = flag_list.get_list()
-            if flags[my_player_number]:  # si un échange n'est pas en cours avec moi
+            input = input_queue.get()
+            if flags[my_player_number] and len(input) > 2:  # si un échange n'est pas en cours avec moi
                 flags[my_player_number] = False
                 offer_list = offer.offer_list()
                 offer_list.acquire()
                 old_offers = offer_list.get_list()
 
-                input = input_queue.get()
                 input = input[:-1]
                 if input[0] + input[1] == "o:":
                     valid_offer = offer_validity(input[2:], deck)
@@ -246,6 +247,7 @@ if __name__ == "__main__":
                         err_message = "invalid accept"
 
                 else:
+                    flags[my_player_number] = True
                     err_message = "input error"
 
                 flag_list.put_list(flags)
@@ -255,9 +257,9 @@ if __name__ == "__main__":
                 print("")
                 print("MY PLAYER NUMBER :", my_player_number)
                 display_offers(new_offers)
-                print("YOUR DECK : ", deck)
-                print("YOUR OFFER (N°", my_player_number, ") :", my_offer)
-                print("(to make a new offer, type \"o:\" and first letters of cards)")
+                print("YOUR HAND :", deck)
+                print("YOUR OFFER :", my_offer)
+                print("(to make a new offer, type \"o:\" and the first letter of the card)")
                 print("(to accept an offer, type \"a:\" and its number)")
             else:
                 err_message = "an exchange is already in progress"
@@ -293,14 +295,14 @@ if __name__ == "__main__":
             print("")
             print("MY PLAYER NUMBER :", my_player_number)
             display_offers(new_offers)
-            print("YOUR DECK : ", deck)
-            print("YOUR OFFER (N°", my_player_number, ") :", my_offer)
-            print("(to make a new offer, type \"o:\" and first letters of cards)")
+            print("YOUR HAND :", deck)
+            print("YOUR OFFER :", my_offer)
+            print("(to make a new offer, type \"o:\" and the first letter of the card)")
             print("(to accept an offer, type \"a:\" and its number)")
         except BusyError:
             a = 1
 
-        if check_win(deck):
+        if check_win(deck) and not i_win:
 
             pid_list.acquire()
             tab = pid_list.get_list()
@@ -308,7 +310,7 @@ if __name__ == "__main__":
             pid_list.put_list(tab)
             pid_list.release()
             os.kill(game_pid, signal.SIGUSR1)
-            game_over = True
+            i_win = True
 
         old_offers = new_offers
 

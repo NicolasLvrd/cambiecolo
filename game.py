@@ -1,6 +1,7 @@
 import queue
 import random
 import threading
+import time
 from multiprocessing.managers import BaseManager
 import sysv_ipc
 import signal
@@ -160,14 +161,13 @@ if __name__ == "__main__":
                 pid_list.release()
 
                 for i in range(players_number):
-                    try:
-                        os.kill(tab[i], signal.SIGUSR2)
-                    except ProcessLookupError:
-                        players_number -= 1
+                    os.kill(tab[i], signal.SIGUSR2)
 
                 for i in range(players_number):
                     message, t = mq_setting_up.receive(True, 3)
                     print("a player ack the end of game")
+
+                time.sleep(2)
 
                 mq_setting_up.remove()
                 mq_communication.remove()
@@ -183,7 +183,7 @@ if __name__ == "__main__":
                 offer_list.put_list(tab)
                 offer_list.release()
 
-                flag_list = offer.offer_list()
+                flag_list = flag.flag_list()
                 flag_list.acquire()
                 flag_list.put_list(tab)
                 flag_list.release()
